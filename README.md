@@ -11,7 +11,7 @@ It is not intended to be used for all associations though, but only where necess
 
 ## Description
 
-This gem has a very simple implementation and delegates all batch loading responsibilities (used to avoid N+1 calls to the database) to the [batch-loader gem](https://github.com/exAspArk/batch-loader). It allows to generate a lazy association accessor with a simple statement: `association_accessor :association_name`.
+This gem has a very simple implementation and delegates all batch loading responsibilities (used to avoid N+1 calls to the database) to the [batch-loader gem](https://github.com/exAspArk/batch-loader). It allows to generate a lazy association accessor with a simple statement: `lazy_association_accessor :association_name`.
 
 Refer to the [CHANGELOG](https://github.com/mathieul/batch-loader-active-record/blob/master/CHANGELOG.md) to know what is supported and what is not.
 
@@ -30,7 +30,7 @@ For example let's imagine a post which can have many comments:
 class Post < ActiveRecord::Base
   include BatchLoaderActiveRecord
   has_many :comments
-  association_accessor :comments
+  lazy_association_accessor :comments
 end
 
 class Comment < ActiveRecord::Base
@@ -201,7 +201,7 @@ Consider the following data model:
 class User < ActiveRecord::Base
   include BatchLoaderActiveRecord
   has_and_belongs_to_many :roles
-  association_accessor :roles
+  lazy_association_accessor :roles
 end
 
 class Role < ActiveRecord::Base

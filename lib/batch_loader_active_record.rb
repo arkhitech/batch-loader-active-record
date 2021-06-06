@@ -10,7 +10,7 @@ module BatchLoaderActiveRecord
   end
 
   module ClassMethods
-    def association_accessor(name)
+    def lazy_association_accessor(name)
       reflection = reflect_on_association(name) or raise "Can't find association #{name.inspect}"
       manager = AssociationManager.new(model: self, reflection: reflection)
       case reflection.macro
