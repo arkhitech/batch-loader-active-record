@@ -11,44 +11,61 @@ module BatchLoaderActiveRecord
       :"#{reflection.name}_lazy"
     end
 
-    def belongs_to_batch_loader(instance)
+    def belongs_to_batch_loader(instance, options = nil)
+      options ||= {}
+      custom_key = batch_key
+
+      relation = relation_with_scope(instance, options && options[:scope])
+      custom_key += [relation.to_sql.hash] if options
+
       foreign_key_value = instance.send(reflection.foreign_key) or return nil
-      BatchLoader.for(foreign_key_value).batch(key: batch_key) do |foreign_key_values, loader|
-        target_scope.where(id: foreign_key_values).each { |instance| loader.call(instance.id, instance) }
+      BatchLoader.for(foreign_key_value).batch(key: custom_key) do |foreign_key_values, loader|
+        relation.where(id: foreign_key_values).each { |instance| loader.call(instance.id, instance) }
       end
     end
 
-    def polymorphic_belongs_to_batch_loader(instance)
+    def polymorphic_belongs_to_batch_loader(instance, options = nil)
+      custom_key = batch_key
+
+      # relation = relation_with_scope(options[:scope])
+      # custom_key += [relation.to_sql.hash] if options
+      custom_key += [options.hash] if options
+
       foreign_id = instance.send(reflection.foreign_key) or return nil
       foreign_type = instance.send(reflection.foreign_type)&.constantize or return nil
-      BatchLoader.for([foreign_type, foreign_id]).batch(key: batch_key) do |foreign_ids_types, loader|
+      BatchLoader.for([foreign_type, foreign_id]).batch(key: custom_key) do |foreign_ids_types, loader|
         foreign_ids_types
           .group_by(&:first)
           .each do |type, type_ids|
             ids = type_ids.map(&:second)
-            klass_scope(type).where(id: ids).each do |instance|
+            klass_scope_with_scope = klass_scope(type).where(id: ids)
+            klass_scope_with_scope = klass_scope_with_scope.merge(options[:scope]) if options && options[:scope]
+            klass_scope_with_scope.each do |instance|
               loader.call([type, instance.id], instance)
             end
           end
       end
     end
 
-    def has_one_to_batch_loader(instance)
-      BatchLoader.for(instance.id).batch(key: batch_key) do |model_ids, loader|
-        relation = target_scope.where(reflection.foreign_key => model_ids)
-        relation = relation.where(reflection.type => model.to_s) if reflection.type
+    def has_one_to_batch_loader(instance, options = nil)
+      custom_key = batch_key
+
+      relation = relation_with_scope(instance, options && options[:scope])
+      custom_key += [relation.to_sql.hash] if options
+      BatchLoader.for(instance.id).batch(key: custom_key) do |model_ids, loader|
+        relation = relation.where(reflection.foreign_key => model_ids)
         relation.each do |instance|
           loader.call(instance.public_send(reflection.foreign_key), instance)
         end
       end
     end
 
-    def has_many_to_batch_loader(instance, instance_scope)
+    def has_many_to_batch_loader(instance, options = nil)
       custom_key = batch_key
-      custom_key += [instance_scope.to_sql.hash] unless instance_scope.nil?
+
+      relation = relation_with_scope(instance, options && options[:scope])
+      custom_key += [relation.to_sql.hash] if options
       BatchLoader.for(instance.id).batch(default_value: [], key: custom_key) do |model_ids, loader|
-        relation = relation_with_scope(instance_scope)
-        relation = relation.where(reflection.type => model.to_s) if reflection.type
         if reflection.through_reflection
           instances = fetch_for_model_ids(model_ids, relation: relation)
           instances.each do |instance|
@@ -62,16 +79,22 @@ module BatchLoaderActiveRecord
       end
     end
 
-    def has_and_belongs_to_many_to_batch_loader(instance, instance_scope)
+    def has_and_belongs_to_many_to_batch_loader(instance, options = nil)
       custom_key = batch_key
-      custom_key += [instance_scope.to_sql.hash] unless instance_scope.nil?
+
+      relation = relation_with_scope(instance, options && options[:scope])
+      custom_key += [relation.to_sql.hash] if options
       BatchLoader.for(instance.id).batch(default_value: [], key: custom_key) do |model_ids, loader|
         instance_id_path = "#{reflection.join_table}.#{reflection.foreign_key}"
-        relation_with_scope(instance_scope)
-          .joins(habtm_join(reflection))
-          .where("#{reflection.join_table}.#{reflection.foreign_key} IN (?)", model_ids)
-          .select("#{target_scope.table_name}.*, #{instance_id_path} AS _instance_id")
-          .each do |instance|
+        if relation.select_values.any?
+          select_relation = relation.merge(relation.select("#{instance_id_path} AS _instance_id"))
+        else
+          select_relation = relation.select("#{relation.table_name}.*, #{instance_id_path} AS _instance_id")
+        end
+        select_relation.
+          joins(habtm_join(reflection)).
+          where("#{reflection.join_table}.#{reflection.foreign_key}" => model_ids).
+          each do |instance|
             loader.call(instance.public_send(:_instance_id)) { |value| value << instance }
           end
       end
@@ -79,27 +102,40 @@ module BatchLoaderActiveRecord
 
     private
 
-    def relation_with_scope(instance_scope)
-      if instance_scope.nil?
-        target_scope
-      else
-        target_scope.instance_eval { instance_scope }
+    def relation_with_scope(instance, instance_scope)
+      @relation_with_scope ||= {}
+      @relation_with_scope[instance_scope&.hash || ''] ||= begin
+        relation = instance.association(reflection.name).send(:target_scope)
+        if instance_scope
+          relation = relation.merge(instance_scope)
+          # relation = target_scope.merge(instance_scope)
+        # else
+          # relation = target_scope
+        end
+        # if reflection.type
+        #   if reflection.through_reflection
+        #     relation = relation.where(reflection.type => reflection.through_reflection.class_name)
+        #   else
+        #     relation = relation.where(reflection.type => model.to_s)
+        #   end
+        # end
+        relation
       end
     end
 
     def target_scope
-      @target_scope ||= if reflection.scope.nil?
-        reflection.klass
+      @target_scope ||= if reflection.scope
+        reflection.klass.scope_for_association.merge(reflection.scope)
       else
-        reflection.klass.instance_eval(&reflection.scope)
+        reflection.klass.scope_for_association
       end
     end
 
     def klass_scope(klass)
-      if reflection.scope.nil?
-        klass
+      if reflection.scope
+        klass.scope_for_association.merge(reflection.scope)
       else
-        klass.instance_eval(&reflection.scope)
+        klass.scope_for_association
       end
     end
 
@@ -115,12 +151,16 @@ module BatchLoaderActiveRecord
       reflections.each_cons(2) do |previous, current|
         join_strings << reflection_join(current, previous.active_record)
       end
-      select_relation = join_strings.reduce(relation) do |select_relation, join_string|
+      if relation.select_values.any?
+        select_relation = relation.merge(relation.select("#{instance_id_path} AS _instance_id"))
+      else
+        select_relation = relation.select("#{relation.table_name}.*, #{instance_id_path} AS _instance_id")
+      end
+
+      select_relation = join_strings.reduce(select_relation) do |select_relation, join_string|
         select_relation.joins(join_string)
       end
-      select_relation
-        .where("#{model_class.table_name}.#{model_class.primary_key} IN (?)", ids)
-        .select("#{relation.table_name}.*, #{instance_id_path} AS _instance_id")
+      select_relation = select_relation.where("#{model_class.table_name}.#{model_class.primary_key} IN (?)", ids)
     end
 
     def reflection_chain(reflection)

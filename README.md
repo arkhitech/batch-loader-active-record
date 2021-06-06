@@ -1,4 +1,4 @@
-# Batch Loader - Active Record #
+# Batch Loader - Active Record
 
 [![Build Status](https://travis-ci.org/mathieul/batch-loader-active-record.svg?branch=master)](https://travis-ci.org/mathieul/batch-loader-active-record)
 [![Gem Version](https://badge.fury.io/rb/batch-loader-active-record.svg)](https://badge.fury.io/rb/batch-loader-active-record)
@@ -9,7 +9,6 @@ It is not intended to be used for all associations though, but only where necess
 
 **This gem is in active deployment and is likely not yet ready to be used on production.**
 
-
 ## Description
 
 This gem has a very simple implementation and delegates all batch loading responsibilities (used to avoid N+1 calls to the database) to the [batch-loader gem](https://github.com/exAspArk/batch-loader). It allows to generate a lazy association accessor with a simple statement: `association_accessor :association_name`.
@@ -18,10 +17,10 @@ Refer to the [CHANGELOG](https://github.com/mathieul/batch-loader-active-record/
 
 It is also possible to use one of the macros below in replacement of the original Active Record macro to both declare the association and trigger a lazy association accessort in a single statement.
 
-* `belongs_to_lazy`
-* `has_one_lazy`
-* `has_many_lazy`
-* `has_and_belongs_to_many_lazy`
+- `belongs_to_lazy`
+- `has_one_lazy`
+- `has_many_lazy`
+- `has_and_belongs_to_many_lazy`
 
 As soon as your lazy association accessor needs to do more than fetch all records of an association (using a scope or not), you're going to want to directly use the batch-loader gem. For more details on N+1 queries read the [batch-loader gem README](https://github.com/exAspArk/batch-loader/#why).
 
@@ -49,7 +48,6 @@ It is important to note that Active Record association accessors return relation
 
 To benefit from the query batching we must first collect the lazy associations for each model instance in our collection, and only then we can start using them to access their content. Accessing a lazy object too early triggers the database query too early. For instance using `#flat_map` to collect and use the lazy objects would fail as `#flat_map` does access each element of the collection immediately in order to flatten the result.
 
-
 ## Installation
 
 Add this line to your application's Gemfile:
@@ -68,12 +66,11 @@ Or install it yourself as:
 
 Note that this gem supports [active record gem](https://rubygems.org/gems/activerecord) version 4.2.10 and above.
 
-
 ## Usage
 
 Include the `BatchLoaderActiveRecord` module at the beginning of the model classes where lazy associations are needed, and use one of the lazy class macros to declare all lazy associations.
 
-### Belongs To ###
+### Belongs To
 
 Consider the following data model:
 
@@ -98,7 +95,7 @@ posts.map(&:author_first_name)
 # => ["Jane", "Anne", ...]
 ```
 
-### Has One ###
+### Has One
 
 Consider the following data model:
 
@@ -124,7 +121,7 @@ affiliates.compact
 # => [#<Affiliate id: 123>, #<Affiliate id: 456>]
 ```
 
-### Has Many ###
+### Has Many
 
 Consider the following data model:
 
@@ -149,11 +146,10 @@ contacts.map(&:phone_numbers_lazy).flatten
 It is also possible to apply scopes and conditions to a lazy has_many association. For instance if we want to only fetch enabled phone numbers in the example above, you would specify the scope like so:
 
 ```ruby
-contacts.map { |contact| contact.phone_numbers_lazy(PhoneNumber.enabled) }.flatten
+contacts.map { |contact| contact.phone_numbers_lazy(scope: -> {enabled}) }.flatten
 ```
 
-
-### Has Many :through ###
+### Has Many :through
 
 Consider the following data model with a has-many association going through another has-many-through association. Agents can have many phones they use to call providers:
 
@@ -197,7 +193,7 @@ INNER JOIN agents ON agents.ID = phones.agent_id
 WHERE (agents. ID IN(4212, 265, 2309))
 ```
 
-### Has And Belongs To Many ###
+### Has And Belongs To Many
 
 Consider the following data model:
 
@@ -219,7 +215,6 @@ This time we want the list of roles for a collection of users.
 users.map(&:roles_lazy).flatten
 ```
 
-
 ## Development
 
 After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
@@ -240,7 +235,7 @@ bundle exec appraisal rspec
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/mathieul/batch-loader-active-record. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
+Bug reports and pull requests are welcome on GitHub at https://github.com/arkhitech/batch-loader-active-record. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
 
 ## License
 
