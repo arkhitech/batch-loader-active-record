@@ -11,12 +11,15 @@ module BatchLoaderActiveRecord
       :"#{reflection.name}_lazy"
     end
 
+    def loaded_accessor_name
+      :"#{reflection.name}_lazy_loaded"
+    end
+
     def writer_name
-      :"#{reflection.name}_lazy_load"
+      :"#{reflection.name}_lazy_override"
     end
 
     def belongs_to_batch_loader(instance, options = nil)
-      options ||= {}
       custom_key = batch_key
 
       relation = relation_with_scope(instance, options && options[:scope])
