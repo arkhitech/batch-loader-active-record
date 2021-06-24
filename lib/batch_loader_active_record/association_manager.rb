@@ -15,10 +15,6 @@ module BatchLoaderActiveRecord
       :"#{reflection.name}_lazy_loaded"
     end
 
-    def writer_name
-      :"#{reflection.name}_lazy_override"
-    end
-
     def belongs_to_batch_loader(instance, options = nil)
       custom_key = batch_key
 
