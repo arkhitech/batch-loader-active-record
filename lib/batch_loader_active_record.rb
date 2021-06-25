@@ -29,6 +29,7 @@ module BatchLoaderActiveRecord
         end  
       end
       class_eval <<-CODE, __FILE__, __LINE__ + 1          
+        alias_method :#{name}_without_lazy, :#{name}
         def #{name}
           if @__#{name}
             !@__#{name}.nil? && @__#{name} || nil
@@ -46,6 +47,7 @@ module BatchLoaderActiveRecord
         instance_variable_set("@__#{name}", manager.has_one_to_batch_loader(self, options))
       end
       class_eval <<-CODE, __FILE__, __LINE__ + 1          
+        alias_method :#{name}_without_lazy, :#{name}
         def #{name}
           if @__#{name}
             !@__#{name}.nil? && @__#{name} || nil
@@ -63,6 +65,7 @@ module BatchLoaderActiveRecord
         instance_variable_set("@__#{name}", manager.has_many_to_batch_loader(self, options))
       end
       class_eval <<-CODE, __FILE__, __LINE__ + 1          
+        alias_method :#{name}_without_lazy, :#{name}
         def #{name}
           if @__#{name}
             !@__#{name}.nil? && @__#{name} || nil
@@ -80,6 +83,7 @@ module BatchLoaderActiveRecord
         instance_variable_set("@__#{name}", manager.has_and_belongs_to_many_to_batch_loader(self, options))
       end
       class_eval <<-CODE, __FILE__, __LINE__ + 1          
+        alias_method :#{name}_without_lazy, :#{name}
         def #{name}
           if @__#{name}
             !@__#{name}.nil? && @__#{name} || nil
