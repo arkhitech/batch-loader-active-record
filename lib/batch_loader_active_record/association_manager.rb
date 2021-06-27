@@ -17,7 +17,6 @@ module BatchLoaderActiveRecord
 
     def belongs_to_batch_loader(instance, options = nil)
       custom_key = batch_key
-
       relation = relation_with_scope(instance, options && options[:scope])
       custom_key += [relation.to_sql.hash] if options
 
@@ -109,6 +108,9 @@ module BatchLoaderActiveRecord
       @relation_with_scope ||= {}
       @relation_with_scope[instance_scope&.hash || ''] ||= begin
         relation = instance.association(reflection.name).send(:target_scope)
+        if reflection.scope
+          relation = relation.merge(reflection.scope)
+        end
         if instance_scope
           relation = relation.merge(instance_scope)
           # relation = target_scope.merge(instance_scope)
