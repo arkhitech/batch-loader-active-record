@@ -18,7 +18,7 @@ module BatchLoaderActiveRecord
     end
     private :define_reader_load_method
     
-    def define_belongs_to_methods(name, reflection, manager)
+    def define_belongs_to_methods(name, reflection, manager, override = true)
       if reflection.polymorphic?
         define_method(manager.accessor_name) do |options = nil|
           instance_variable_set("@__#{name}", manager.polymorphic_belongs_to_batch_loader(self, options))
@@ -28,86 +28,94 @@ module BatchLoaderActiveRecord
           instance_variable_set("@__#{name}", manager.belongs_to_batch_loader(self, options))
         end  
       end
-      class_eval <<-CODE, __FILE__, __LINE__ + 1          
-        alias_method :#{name}_without_lazy, :#{name}
-        def #{name}
-          if @__#{name}
-            !@__#{name}.nil? && @__#{name} || nil
-          else 
-            super
-          end      
-        end
-      CODE
+      if override
+        class_eval <<-CODE, __FILE__, __LINE__ + 1          
+          alias_method :#{name}_without_lazy, :#{name}
+          def #{name}
+            if @__#{name}
+              !@__#{name}.nil? && @__#{name} || nil
+            else 
+              super
+            end      
+          end
+        CODE
+      end
       define_reader_load_method(manager)
     end
     private :define_belongs_to_methods
 
-    def define_has_one_methods(name, reflection, manager)
+    def define_has_one_methods(name, reflection, manager, override = true)
       define_method(manager.accessor_name) do |options = nil|
         instance_variable_set("@__#{name}", manager.has_one_to_batch_loader(self, options))
       end
-      class_eval <<-CODE, __FILE__, __LINE__ + 1          
-        alias_method :#{name}_without_lazy, :#{name}
-        def #{name}
-          if @__#{name}
-            !@__#{name}.nil? && @__#{name} || nil
-          else 
-            super
-          end      
-        end
-      CODE
+      if override
+        class_eval <<-CODE, __FILE__, __LINE__ + 1          
+          alias_method :#{name}_without_lazy, :#{name}
+          def #{name}
+            if @__#{name}
+              !@__#{name}.nil? && @__#{name} || nil
+            else 
+              super
+            end      
+          end
+        CODE
+      end
       define_reader_load_method(manager)      
     end
     private :define_has_one_methods
 
-    def define_has_many_methods(name, reflection, manager)
+    def define_has_many_methods(name, reflection, manager, override = true)
       define_method(manager.accessor_name) do |options = nil|
         instance_variable_set("@__#{name}", manager.has_many_to_batch_loader(self, options))
       end
-      class_eval <<-CODE, __FILE__, __LINE__ + 1          
-        alias_method :#{name}_without_lazy, :#{name}
-        def #{name}
-          if @__#{name}
-            !@__#{name}.nil? && @__#{name} || nil
-          else 
-            super
-          end      
-        end
-      CODE
+      if override
+        class_eval <<-CODE, __FILE__, __LINE__ + 1          
+          alias_method :#{name}_without_lazy, :#{name}
+          def #{name}
+            if @__#{name}
+              !@__#{name}.nil? && @__#{name} || nil
+            else 
+              super
+            end      
+          end
+        CODE
+      end
       define_reader_load_method(manager)      
     end
     private :define_has_many_methods
 
-    def define_has_and_belongs_to_many_methods(name, reflection, manager)
+    def define_has_and_belongs_to_many_methods(name, reflection, manager, override = true)
       define_method(manager.accessor_name) do |options = nil|
         instance_variable_set("@__#{name}", manager.has_and_belongs_to_many_to_batch_loader(self, options))
       end
-      class_eval <<-CODE, __FILE__, __LINE__ + 1          
-        alias_method :#{name}_without_lazy, :#{name}
-        def #{name}
-          if @__#{name}
-            !@__#{name}.nil? && @__#{name} || nil
-          else 
-            super
-          end      
-        end
-      CODE
+      if override
+        class_eval <<-CODE, __FILE__, __LINE__ + 1          
+          alias_method :#{name}_without_lazy, :#{name}
+          def #{name}
+            if @__#{name}
+              !@__#{name}.nil? && @__#{name} || nil
+            else 
+              super
+            end      
+          end
+        CODE
+      end
       define_reader_load_method(manager)      
     end
     private :define_has_and_belongs_to_many_methods
 
-    def lazy_association_accessor(name)
+    def lazy_association_accessor(name, override = true)
       reflection = reflect_on_association(name) or raise "Can't find association #{name.inspect}"
       manager = AssociationManager.new(model: self, reflection: reflection)
       case reflection.macro
       when :belongs_to
-        define_belongs_to_methods(name, reflection, manager)
+        define_belongs_to_methods(name, reflection, manager, override)
       when :has_one
-        define_has_one_methods(name, reflection, manager)
+        define_has_one_methods(name, reflection, manager, override)
       when :has_many
-        define_has_many_methods(name, reflection, manager)
+        define_has_many_methods(name, reflection, manager, override)
       when :has_and_belongs_to_many
-        define_has_and_belongs_to_many_methods(name, reflection, manager)
+        define_has_and_belongs_to_many_methods(name, reflection, manager, override)
       else
         raise NotImplementedError, "association kind #{reflection.macro.inspect} is not yet supported"
       end
