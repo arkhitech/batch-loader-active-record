@@ -3,6 +3,7 @@
 require "batch-loader"
 require "batch_loader_active_record/version"
 require "batch_loader_active_record/association_manager"
+require "batch_loader_active_record/association_proxy"
 
 module BatchLoaderActiveRecord
   def self.included(base)
@@ -73,7 +74,10 @@ module BatchLoaderActiveRecord
           alias_method :#{name}_without_lazy, :#{name}
           def #{name}
             if @__#{name}
-              !@__#{name}.nil? && @__#{name} || nil
+              @__#{name}_proxy ||= begin
+                records = !@__#{name}.nil? && @__#{name} || []
+                association_proxy = AssociationProxy.new(super, records)
+              end              
             else 
               super
             end      
@@ -93,7 +97,10 @@ module BatchLoaderActiveRecord
           alias_method :#{name}_without_lazy, :#{name}
           def #{name}
             if @__#{name}
-              !@__#{name}.nil? && @__#{name} || nil
+              @__#{name}_proxy ||= begin
+                records = !@__#{name}.nil? && @__#{name} || []
+                association_proxy = AssociationProxy.new(super, records)
+              end              
             else 
               super
             end      
