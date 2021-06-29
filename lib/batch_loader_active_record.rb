@@ -46,8 +46,14 @@ module BatchLoaderActiveRecord
     private :define_belongs_to_methods
 
     def define_has_one_methods(name, reflection, manager, override = true)
-      define_method(manager.accessor_name) do |options = nil|
-        instance_variable_set("@__#{name}", manager.has_one_to_batch_loader(self, options))
+      if reflection.options[:as]
+        define_method(manager.accessor_name) do |options = nil|
+          instance_variable_set("@__#{name}", manager.polymorphic_has_one_to_batch_loader(self, options))
+        end
+      else
+        define_method(manager.accessor_name) do |options = nil|
+          instance_variable_set("@__#{name}", manager.has_one_to_batch_loader(self, options))
+        end
       end
       if override
         class_eval <<-CODE, __FILE__, __LINE__ + 1          
@@ -66,8 +72,14 @@ module BatchLoaderActiveRecord
     private :define_has_one_methods
 
     def define_has_many_methods(name, reflection, manager, override = true)
-      define_method(manager.accessor_name) do |options = nil|
-        instance_variable_set("@__#{name}", manager.has_many_to_batch_loader(self, options))
+      if reflection.options[:as]
+        define_method(manager.accessor_name) do |options = nil|
+          instance_variable_set("@__#{name}", manager.polymorphic_has_many_to_batch_loader(self, options))
+        end
+      else
+        define_method(manager.accessor_name) do |options = nil|
+          instance_variable_set("@__#{name}", manager.has_many_to_batch_loader(self, options))
+        end
       end
       if override
         class_eval <<-CODE, __FILE__, __LINE__ + 1          

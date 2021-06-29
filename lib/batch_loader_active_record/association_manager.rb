@@ -49,6 +49,25 @@ module BatchLoaderActiveRecord
       end
     end
 
+    def polymorphic_has_one_to_batch_loader(instance, options = nil)
+      custom_key = batch_key
+
+      relation = relation_with_scope(instance, options && options[:scope])
+      custom_key += [relation.to_sql.hash] if options
+      foreign_id = instance.id or return nil
+      foreign_type = instance.class.name or return nil
+      BatchLoader.for([foreign_type, foreign_id]).batch(key: custom_key) do |foreign_ids_types, loader|
+        foreign_ids_types
+          .group_by(&:first)
+          .each do |type, type_ids|
+            model_ids = type_ids.map(&:second)
+            relation.where(reflection.foreign_key => model_ids, "#{reflection.options[:as]}_type" => type).each do |instance|              
+              loader.call([type, instance.public_send(reflection.foreign_key)], instance)
+            end  
+          end
+      end
+    end
+
     def has_one_to_batch_loader(instance, options = nil)
       custom_key = batch_key
 
@@ -59,6 +78,25 @@ module BatchLoaderActiveRecord
         relation.each do |instance|
           loader.call(instance.public_send(reflection.foreign_key), instance)
         end
+      end
+    end
+
+    def polymorphic_has_many_to_batch_loader(instance, options = nil)
+      custom_key = batch_key
+
+      relation = relation_with_scope(instance, options && options[:scope])
+      custom_key += [relation.to_sql.hash] if options
+      foreign_id = instance.id or return nil
+      foreign_type = instance.class.name or return nil
+      BatchLoader.for([foreign_type, foreign_id]).batch(default_value: [], key: custom_key) do |foreign_ids_types, loader|
+        foreign_ids_types
+          .group_by(&:first)
+          .each do |type, type_ids|
+            model_ids = type_ids.map(&:second)
+            relation.where(reflection.foreign_key => model_ids, "#{reflection.options[:as]}_type" => type).each do |instance|
+              loader.call([type, instance.public_send(reflection.foreign_key)]) { |value| value << instance }
+            end  
+          end
       end
     end
 
