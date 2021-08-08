@@ -14,7 +14,7 @@ module BatchLoaderActiveRecord
     def define_reader_load_method(manager)
       define_method(manager.loaded_accessor_name) do |options = nil|
         association_object = self.send(manager.accessor_name, options)
-        !association_object.nil? && association_object || nil
+        association_object.__sync
       end
     end
     private :define_reader_load_method
@@ -140,36 +140,32 @@ module BatchLoaderActiveRecord
       end
     end
 
-    def belongs_to_lazy(*args)
-      belongs_to(*args).tap do
-        name = args[0]
+    def belongs_to_lazy(name, scope = nil, **options)
+      belongs_to(name, scope, **options).tap do
         reflection = reflect_on_association(name) or raise "Can't find association #{name.inspect}"
         manager = AssociationManager.new(model: self, reflection: reflection)
         define_belongs_to_methods(name, reflection, manager)
       end
     end
 
-    def has_one_lazy(*args)
-      has_one(*args).tap do
-        name = args[0]
+    def has_one_lazy(name, scope = nil, **options)
+      has_one(name, scope, **options).tap do
         reflection = reflect_on_association(name) or raise "Can't find association #{name.inspect}"
         manager = AssociationManager.new(model: self, reflection: reflection)
         define_has_one_methods(name, reflection, manager)
       end
     end
 
-    def has_many_lazy(*args)
-      has_many(*args).tap do
-        name = args[0]
+    def has_many_lazy(name, scope = nil, **options, &extension)
+      has_many(name, scope, **options, &extension).tap do
         reflection = reflect_on_association(name) or raise "Can't find association #{name.inspect}"
         manager = AssociationManager.new(model: self, reflection: reflection)
         define_has_many_methods(name, reflection, manager)
       end
     end
 
-    def has_and_belongs_to_many_lazy(*args)
-      has_and_belongs_to_many(*args).tap do
-        name = args[0]
+    def has_and_belongs_to_many_lazy(name, scope = nil, **options, &extension)
+      has_and_belongs_to_many(name, scope, **options, &extension).tap do
         reflection = reflect_on_association(name) or raise "Can't find association #{name.inspect}"
         manager = AssociationManager.new(model: self, reflection: reflection)
         define_has_and_belongs_to_many_methods(name, reflection, manager)
