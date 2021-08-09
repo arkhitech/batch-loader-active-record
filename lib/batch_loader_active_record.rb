@@ -14,7 +14,7 @@ module BatchLoaderActiveRecord
     def define_reader_load_method(manager)
       define_method(manager.loaded_accessor_name) do |options = nil|
         association_object = self.send(manager.accessor_name, options)
-        association_object.__sync
+        association_object&.__sync
       end
     end
     private :define_reader_load_method
