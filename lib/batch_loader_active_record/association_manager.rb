@@ -101,7 +101,7 @@ module BatchLoaderActiveRecord
           .each do |type, type_ids|
             model_ids = type_ids.map(&:second)
             relation.where(reflection.foreign_key => model_ids, "#{reflection.options[:as]}_type" => type).each do |instance|
-              loader.call([type, instance.public_send(reflection.foreign_key)]) { |value| value << instance }
+              loader.call([type, instance.public_send(reflection.foreign_key)]) { |value| value.include?(instance) ? value : (value << instance) }
             end  
           end
       end
@@ -116,11 +116,11 @@ module BatchLoaderActiveRecord
         if reflection.through_reflection
           instances = fetch_for_model_ids(model_ids, relation: relation)
           instances.each do |instance|
-            loader.call(instance.public_send(:_instance_id)) { |value| value << instance }
+            loader.call(instance.public_send(:_instance_id)) { |value| value.include?(instance) ? value : (value << instance) }
           end
         else
           relation.where(reflection.foreign_key => model_ids).each do |instance|
-            loader.call(instance.public_send(reflection.foreign_key)) { |value| value << instance }
+            loader.call(instance.public_send(reflection.foreign_key)) { |value| value.include?(instance) ? value : (value << instance) }
           end
         end
       end
@@ -142,7 +142,7 @@ module BatchLoaderActiveRecord
           joins(habtm_join(reflection)).
           where("#{reflection.join_table}.#{reflection.foreign_key}" => model_ids).
           each do |instance|
-            loader.call(instance.public_send(:_instance_id)) { |value| value << instance }
+            loader.call(instance.public_send(:_instance_id)) { |value| value.include?(instance) ? value : (value << instance) }
           end
       end
     end
