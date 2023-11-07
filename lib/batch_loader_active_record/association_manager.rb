@@ -55,7 +55,7 @@ module BatchLoaderActiveRecord
       relation = relation_with_scope(instance, options && options[:scope])
       custom_key += [relation.to_sql.hash] if options
       foreign_id = instance.id or return nil
-      foreign_type = instance.class.name or return nil
+      foreign_type = instance.class.polymorphic_name || instance.class.name or return nil
       BatchLoader.for([foreign_type, foreign_id]).batch(key: custom_key) do |foreign_ids_types, loader|
         foreign_ids_types
           .group_by(&:first)
@@ -94,7 +94,7 @@ module BatchLoaderActiveRecord
       relation = relation_with_scope(instance, options && options[:scope])
       custom_key += [relation.to_sql.hash] if options
       foreign_id = instance.id or return []
-      foreign_type = instance.class.name or return []
+      foreign_type = instance.class.polymorphic_name || instance.class.name or return []
       BatchLoader.for([foreign_type, foreign_id]).batch(default_value: [], key: custom_key) do |foreign_ids_types, loader|
         foreign_ids_types
           .group_by(&:first)
