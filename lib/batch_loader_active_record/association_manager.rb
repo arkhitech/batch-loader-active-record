@@ -73,7 +73,8 @@ module BatchLoaderActiveRecord
 
       relation = relation_with_scope(instance, options && options[:scope])
       custom_key += [relation.to_sql.hash] if options
-      BatchLoader.for(instance.id).batch(key: custom_key) do |model_ids, loader|
+      model_id = reflection.through_reflection ? instance.send(reflection.foreign_key) : instance.id
+      BatchLoader.for(model_id).batch(key: custom_key) do |model_ids, loader|
         if reflection.through_reflection
           instances = fetch_for_model_ids(model_ids, relation: relation)
           instances.each do |instance|
@@ -112,7 +113,8 @@ module BatchLoaderActiveRecord
 
       relation = relation_with_scope(instance, options && options[:scope])
       custom_key += [relation.to_sql.hash] if options
-      BatchLoader.for(instance.id).batch(default_value: [], key: custom_key) do |model_ids, loader|
+      model_id = reflection.through_reflection ? instance.send(reflection.foreign_key) : instance.id
+      BatchLoader.for(model_id).batch(default_value: [], key: custom_key) do |model_ids, loader|
         if reflection.through_reflection
           instances = fetch_for_model_ids(model_ids, relation: relation)
           instances.each do |instance|
@@ -194,13 +196,14 @@ module BatchLoaderActiveRecord
     end
 
     def fetch_for_model_ids(ids, relation:)
-      instance_id_path = "#{reflection.active_record.table_name}.#{reflection.active_record.primary_key}"
+      model_key = reflection.through_reflection ? reflection.foreign_key : model_class.primary_key
       model_class = reflection.active_record
       reflections = reflection_chain(reflection)
       join_strings = [reflection_join(reflections.first, relation)]
       reflections.each_cons(2) do |previous, current|
         join_strings << reflection_join(current, previous.active_record)
       end
+      instance_id_path = "#{model_class.table_name}.#{model_key}"
       if relation.select_values.any?
         select_relation = relation.merge(relation.select("#{instance_id_path} AS _instance_id"))
       else
@@ -210,7 +213,7 @@ module BatchLoaderActiveRecord
       select_relation = join_strings.reduce(select_relation) do |select_relation, join_string|
         select_relation.joins(join_string)
       end
-      select_relation = select_relation.where("#{model_class.table_name}.#{model_class.primary_key} IN (?)", ids)
+      select_relation = select_relation.where("#{model_class.table_name}.#{model_key} IN (?)", ids)
     end
 
     def reflection_chain(reflection)
