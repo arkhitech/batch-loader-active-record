@@ -52,7 +52,11 @@ module BatchLoaderActiveRecord
         end
       else
         define_method(manager.accessor_name) do |options = nil|
-          instance_variable_set("@__#{name}", manager.has_one_to_batch_loader(self, options))
+          if new_record?
+            self.send("#{name}_without_lazy")
+          else
+            instance_variable_set("@__#{name}", manager.has_one_to_batch_loader(self, options))
+          end
         end
       end
       if override
@@ -78,14 +82,18 @@ module BatchLoaderActiveRecord
         end
       else
         define_method(manager.accessor_name) do |options = nil|
-          instance_variable_set("@__#{name}", manager.has_many_to_batch_loader(self, options))
+          if new_record?
+            self.send("#{name}_without_lazy")
+          else
+            instance_variable_set("@__#{name}", manager.has_many_to_batch_loader(self, options))
+          end
         end
       end
       if override
         class_eval <<-CODE, __FILE__, __LINE__ + 1          
           alias_method :#{name}_without_lazy, :#{name}
           def #{name}
-            if @__#{name}
+            if @__#{name} && !new_record?
               @__#{name}_proxy ||= begin
                 records = !@__#{name}.nil? && @__#{name} || []
                 association_proxy = AssociationProxy.new(super, records)

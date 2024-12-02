@@ -73,7 +73,8 @@ module BatchLoaderActiveRecord
 
       relation = relation_with_scope(instance, options && options[:scope])
       custom_key += [relation.to_sql.hash] if options
-      model_id = reflection.through_reflection ? instance.send(reflection.foreign_key) : instance.id
+      # model_id = reflection.through_reflection ? instance.send(reflection.foreign_key) : instance.id
+      model_id = instance.id
       BatchLoader.for(model_id).batch(key: custom_key) do |model_ids, loader|
         if reflection.through_reflection
           instances = fetch_for_model_ids(model_ids, relation: relation)
@@ -113,7 +114,8 @@ module BatchLoaderActiveRecord
 
       relation = relation_with_scope(instance, options && options[:scope])
       custom_key += [relation.to_sql.hash] if options
-      model_id = reflection.through_reflection ? instance.send(reflection.foreign_key) : instance.id
+      # model_id = reflection.through_reflection ? instance.send(reflection.foreign_key) : instance.id
+      model_id = instance.id
       BatchLoader.for(model_id).batch(default_value: [], key: custom_key) do |model_ids, loader|
         if reflection.through_reflection
           instances = fetch_for_model_ids(model_ids, relation: relation)
@@ -196,8 +198,9 @@ module BatchLoaderActiveRecord
     end
 
     def fetch_for_model_ids(ids, relation:)
-      model_key = reflection.through_reflection ? reflection.foreign_key : model_class.primary_key
       model_class = reflection.active_record
+      # model_key = reflection.through_reflection ? reflection.foreign_key : model_class.primary_key
+      model_key = model_class.primary_key
       reflections = reflection_chain(reflection)
       join_strings = [reflection_join(reflections.first, relation)]
       reflections.each_cons(2) do |previous, current|
