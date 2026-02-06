@@ -13,8 +13,12 @@ module BatchLoaderActiveRecord
     # ensures that object is loaded immediately or nil is returned
     def define_reader_load_method(manager)
       define_method(manager.loaded_accessor_name) do |options = nil|
-        association_object = self.send(manager.accessor_name, options)
-        association_object&.__sync
+        if new_record?
+          self.send(manager.reflection.name)
+        else
+          association_object = self.send(manager.accessor_name, options)
+          association_object&.__sync
+        end
       end
     end
     private :define_reader_load_method
@@ -52,11 +56,7 @@ module BatchLoaderActiveRecord
         end
       else
         define_method(manager.accessor_name) do |options = nil|
-          if new_record?
-            self.send("#{name}_without_lazy")
-          else
-            instance_variable_set("@__#{name}", manager.has_one_to_batch_loader(self, options))
-          end
+          instance_variable_set("@__#{name}", manager.has_one_to_batch_loader(self, options))
         end
       end
       if override
@@ -82,18 +82,14 @@ module BatchLoaderActiveRecord
         end
       else
         define_method(manager.accessor_name) do |options = nil|
-          if new_record?
-            self.send("#{name}_without_lazy")
-          else
-            instance_variable_set("@__#{name}", manager.has_many_to_batch_loader(self, options))
-          end
+          instance_variable_set("@__#{name}", manager.has_many_to_batch_loader(self, options))
         end
       end
       if override
         class_eval <<-CODE, __FILE__, __LINE__ + 1          
           alias_method :#{name}_without_lazy, :#{name}
           def #{name}
-            if @__#{name} && !new_record?
+            if @__#{name}
               @__#{name}_proxy ||= begin
                 records = !@__#{name}.nil? && @__#{name} || []
                 association_proxy = AssociationProxy.new(super, records)
