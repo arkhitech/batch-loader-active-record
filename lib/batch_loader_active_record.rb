@@ -13,11 +13,11 @@ module BatchLoaderActiveRecord
     # ensures that object is loaded immediately or nil is returned
     def define_reader_load_method(manager)
       define_method(manager.loaded_accessor_name) do |options = nil|
-        if new_record?
-          self.send(manager.reflection.name)
+        association_object = self.send(manager.accessor_name, options)
+        if association_object.respond_to?(:__sync)
+          association_object.__sync
         else
-          association_object = self.send(manager.accessor_name, options)
-          association_object&.__sync
+          association_object
         end
       end
     end
@@ -26,19 +26,11 @@ module BatchLoaderActiveRecord
     def define_belongs_to_methods(name, reflection, manager, override = true)
       if reflection.polymorphic?
         define_method(manager.accessor_name) do |options = nil|
-          if new_record?
-            self.send(manager.reflection.name)
-          else
-            instance_variable_set("@__#{name}", manager.polymorphic_belongs_to_batch_loader(self, options))
-          end
+          instance_variable_set("@__#{name}", manager.polymorphic_belongs_to_batch_loader(self, options))
         end  
       else
         define_method(manager.accessor_name) do |options = nil|
-          if new_record?
-            self.send(manager.reflection.name)
-          else
-            instance_variable_set("@__#{name}", manager.belongs_to_batch_loader(self, options))
-          end
+          instance_variable_set("@__#{name}", manager.belongs_to_batch_loader(self, options))
         end  
       end
       if override
