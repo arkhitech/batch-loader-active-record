@@ -83,7 +83,7 @@ module BatchLoaderActiveRecord
     end
     private :define_has_one_methods
 
-    def define_has_many_methods(name, reflection, manager, override = true)
+    def define_has_many_methods(name, reflection, manager, override = false)
       if reflection.options[:as]
         define_method(manager.accessor_name) do |options = nil|
           if new_record?
@@ -101,6 +101,7 @@ module BatchLoaderActiveRecord
           end
         end
       end
+      # TODO needs fixing, doesn't work properly
       if override
         class_eval <<-CODE, __FILE__, __LINE__ + 1          
           alias_method :#{name}_without_lazy, :#{name}
@@ -120,7 +121,7 @@ module BatchLoaderActiveRecord
     end
     private :define_has_many_methods
 
-    def define_has_and_belongs_to_many_methods(name, reflection, manager, override = true)
+    def define_has_and_belongs_to_many_methods(name, reflection, manager, override = false)
       define_method(manager.accessor_name) do |options = nil|
         if new_record?
           self.send(manager.reflection.name)
@@ -128,6 +129,7 @@ module BatchLoaderActiveRecord
           instance_variable_set("@__#{name}", manager.has_and_belongs_to_many_to_batch_loader(self, options))
         end
       end
+      # TODO needs fixing, doesn't work properly
       if override
         class_eval <<-CODE, __FILE__, __LINE__ + 1          
           alias_method :#{name}_without_lazy, :#{name}
