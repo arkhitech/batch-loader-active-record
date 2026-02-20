@@ -26,11 +26,27 @@ module BatchLoaderActiveRecord
     def define_belongs_to_methods(name, reflection, manager, override = true)
       if reflection.polymorphic?
         define_method(manager.accessor_name) do |options = nil|
-          instance_variable_set("@__#{name}", manager.polymorphic_belongs_to_batch_loader(self, options))
+          if new_record?
+            instance_variable_set("@__#{name}", send(manager.reflection.name))
+          elsif association(manager.reflection.name).target # not required for belongs_to but keeping it for safety and consistency
+            instance_variable_set("@__#{name}", send(manager.reflection.name))
+          elsif association(manager.reflection.name).loaded?
+            instance_variable_set("@__#{name}", association(manager.reflection.name).target)
+          else
+            instance_variable_set("@__#{name}", manager.polymorphic_belongs_to_batch_loader(self, options))
+          end
         end  
       else
         define_method(manager.accessor_name) do |options = nil|
-          instance_variable_set("@__#{name}", manager.belongs_to_batch_loader(self, options))
+          if new_record?
+            instance_variable_set("@__#{name}", send(manager.reflection.name))
+          elsif association(manager.reflection.name).target
+            instance_variable_set("@__#{name}", send(manager.reflection.name))
+          elsif association(manager.reflection.name).loaded?
+            instance_variable_set("@__#{name}", association(manager.reflection.name).target)
+          else
+            instance_variable_set("@__#{name}", manager.belongs_to_batch_loader(self, options))
+          end
         end  
       end
       if override
@@ -53,7 +69,11 @@ module BatchLoaderActiveRecord
       if reflection.options[:as]
         define_method(manager.accessor_name) do |options = nil|
           if new_record?
-            self.send(manager.reflection.name)
+            instance_variable_set("@__#{name}", send(manager.reflection.name))
+          elsif association(manager.reflection.name).target
+            instance_variable_set("@__#{name}", send(manager.reflection.name))
+          elsif association(manager.reflection.name).loaded?
+            instance_variable_set("@__#{name}", association(manager.reflection.name).target)
           else
             instance_variable_set("@__#{name}", manager.polymorphic_has_one_to_batch_loader(self, options))
           end
@@ -61,7 +81,11 @@ module BatchLoaderActiveRecord
       else
         define_method(manager.accessor_name) do |options = nil|
           if new_record?
-            self.send(manager.reflection.name)
+            instance_variable_set("@__#{name}", send(manager.reflection.name))
+          elsif association(manager.reflection.name).target
+            instance_variable_set("@__#{name}", send(manager.reflection.name))
+          elsif association(manager.reflection.name).loaded?
+            instance_variable_set("@__#{name}", association(manager.reflection.name).target)
           else
             instance_variable_set("@__#{name}", manager.has_one_to_batch_loader(self, options))
           end
@@ -87,7 +111,11 @@ module BatchLoaderActiveRecord
       if reflection.options[:as]
         define_method(manager.accessor_name) do |options = nil|
           if new_record?
-            self.send(manager.reflection.name)
+            instance_variable_set("@__#{name}", send(manager.reflection.name))
+          elsif association(manager.reflection.name).target.any?
+            instance_variable_set("@__#{name}", send(manager.reflection.name))
+          elsif association(manager.reflection.name).loaded?
+            instance_variable_set("@__#{name}", association(manager.reflection.name).target)
           else
             instance_variable_set("@__#{name}", manager.polymorphic_has_many_to_batch_loader(self, options))
           end
@@ -95,13 +123,17 @@ module BatchLoaderActiveRecord
       else
         define_method(manager.accessor_name) do |options = nil|
           if new_record?
-            self.send(manager.reflection.name)
+            instance_variable_set("@__#{name}", send(manager.reflection.name))
+          elsif association(manager.reflection.name).target.any?
+            instance_variable_set("@__#{name}", send(manager.reflection.name))
+          elsif association(manager.reflection.name).loaded?
+            instance_variable_set("@__#{name}", association(manager.reflection.name).target)
           else
             instance_variable_set("@__#{name}", manager.has_many_to_batch_loader(self, options))
           end
         end
       end
-      # TODO needs fixing, doesn't work properly
+      # TODO needs fixing, doesn't work properly as it conflicts with array methods like each returning starting value each time and where clause not working
       if override
         class_eval <<-CODE, __FILE__, __LINE__ + 1          
           alias_method :#{name}_without_lazy, :#{name}
@@ -124,12 +156,16 @@ module BatchLoaderActiveRecord
     def define_has_and_belongs_to_many_methods(name, reflection, manager, override = false)
       define_method(manager.accessor_name) do |options = nil|
         if new_record?
-          self.send(manager.reflection.name)
+          instance_variable_set("@__#{name}", send(manager.reflection.name))
+        elsif association(manager.reflection.name).target.any?
+          instance_variable_set("@__#{name}", send(manager.reflection.name))
+        elsif association(manager.reflection.name).loaded?
+          instance_variable_set("@__#{name}", association(manager.reflection.name).target)
         else
           instance_variable_set("@__#{name}", manager.has_and_belongs_to_many_to_batch_loader(self, options))
         end
       end
-      # TODO needs fixing, doesn't work properly
+      # TODO needs fixing, doesn't work properly as it conflicts with array methods like each returning starting value each time and where clause not working
       if override
         class_eval <<-CODE, __FILE__, __LINE__ + 1          
           alias_method :#{name}_without_lazy, :#{name}
