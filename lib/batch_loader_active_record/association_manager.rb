@@ -73,18 +73,23 @@ module BatchLoaderActiveRecord
 
       relation = relation_with_scope(instance, options && options[:scope])
       custom_key += [relation.to_sql.hash] if options
-      # model_id = reflection.through_reflection ? instance.send(reflection.foreign_key) : instance.id
-      model_id = instance.id
-      BatchLoader.for(model_id).batch(key: custom_key) do |model_ids, loader|
+      inverse_name = reflection.inverse_of&.name
+
+      BatchLoader.for(instance).batch(key: custom_key) do |owners, loader|
+        owners_by_id = owners.index_by(&:id)
+        model_ids = owners_by_id.keys
         if reflection.through_reflection
           instances = fetch_for_model_ids(model_ids, relation: relation)
-          instances.each do |instance|
-            loader.call(instance.public_send(:_instance_id), instance)
+          instances.each do |record|
+            owner = owners_by_id[record.public_send(:_instance_id)]
+            record.association(inverse_name).target = owner if inverse_name && owner
+            loader.call(owner, record)
           end
         else
-          relation = relation.where(reflection.foreign_key => model_ids)
-          relation.each do |instance|
-            loader.call(instance.public_send(reflection.foreign_key), instance)
+          relation.where(reflection.foreign_key => model_ids).each do |record|
+            owner = owners_by_id[record.public_send(reflection.foreign_key)]
+            record.association(inverse_name).target = owner if inverse_name && owner
+            loader.call(owner, record)
           end
         end
       end
@@ -114,17 +119,23 @@ module BatchLoaderActiveRecord
 
       relation = relation_with_scope(instance, options && options[:scope])
       custom_key += [relation.to_sql.hash] if options
-      # model_id = reflection.through_reflection ? instance.send(reflection.foreign_key) : instance.id
-      model_id = instance.id
-      BatchLoader.for(model_id).batch(default_value: [], key: custom_key) do |model_ids, loader|
+      inverse_name = reflection.inverse_of&.name
+
+      BatchLoader.for(instance).batch(default_value: [], key: custom_key) do |owners, loader|
+        owners_by_id = owners.index_by(&:id)
+        model_ids = owners_by_id.keys
         if reflection.through_reflection
           instances = fetch_for_model_ids(model_ids, relation: relation)
-          instances.each do |instance|
-            loader.call(instance.public_send(:_instance_id)) { |value| value.include?(instance) ? value : (value << instance) }
+          instances.each do |record|
+            owner = owners_by_id[record.public_send(:_instance_id)]
+            record.association(inverse_name).target = owner if inverse_name && owner
+            loader.call(owner) { |value| value.include?(record) ? value : (value << record) }
           end
         else
-          relation.where(reflection.foreign_key => model_ids).each do |instance|
-            loader.call(instance.public_send(reflection.foreign_key)) { |value| value.include?(instance) ? value : (value << instance) }
+          relation.where(reflection.foreign_key => model_ids).each do |record|
+            owner = owners_by_id[record.public_send(reflection.foreign_key)]
+            record.association(inverse_name).target = owner if inverse_name && owner
+            loader.call(owner) { |value| value.include?(record) ? value : (value << record) }
           end
         end
       end
