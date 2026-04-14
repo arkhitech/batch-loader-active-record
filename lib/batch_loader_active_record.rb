@@ -185,7 +185,7 @@ module BatchLoaderActiveRecord
     end
     private :define_has_and_belongs_to_many_methods
 
-    def lazy_association_accessor(name, override = true)
+    def lazy_association_accessor(name, override = false)
       reflection = reflect_on_association(name) or raise "Can't find association #{name.inspect}"
       manager = AssociationManager.new(model: self, reflection: reflection)
       case reflection.macro
