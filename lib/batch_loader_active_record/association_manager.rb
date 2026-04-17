@@ -210,13 +210,9 @@ module BatchLoaderActiveRecord
 
     def fetch_for_model_ids(ids, relation:)
       model_class = reflection.active_record
-      # model_key = reflection.through_reflection ? reflection.foreign_key : model_class.primary_key
       model_key = model_class.primary_key
-      reflections = reflection_chain(reflection)
-      join_strings = [reflection_join(reflections.first, relation)]
-      reflections.each_cons(2) do |previous, current|
-        join_strings << reflection_join(current, previous.active_record)
-      end
+      join_reflections = collect_join_reflections(reflection)
+      join_strings = join_reflections.map { |r| direct_reflection_join(r) }
       instance_id_path = "#{model_class.table_name}.#{model_key}"
       if relation.select_values.any?
         select_relation = relation.merge(relation.select("#{instance_id_path} AS _instance_id"))
@@ -230,35 +226,32 @@ module BatchLoaderActiveRecord
       select_relation = select_relation.where("#{model_class.table_name}.#{model_key} IN (?)", ids)
     end
 
-    def reflection_chain(reflection)
-      reflections = [reflection]
-      begin
-        previous   = reflection
-        reflection = previous.source_reflection
-        if reflection && reflection != previous
-          reflections << reflection
-        else
-          reflection = nil
-        end
-      end while reflection
-      reflections.reverse
-    end
-
-    def reflection_join(orig_reflection, model_class)
-      reflection = orig_reflection.through_reflection || orig_reflection
-      id_path = id_path_for(reflection, model_class)
-      table_name = reflection.active_record.table_name
-      id_column = reflection.belongs_to? ? reflection.foreign_key : reflection.active_record.primary_key
-      "INNER JOIN #{table_name} ON #{table_name}.#{id_column} = #{id_path}"
-    end
-
-    def id_path_for(reflection, model_class)
-      id_column = if reflection.belongs_to?
-        model_class.primary_key
+    # Recursively flattens a (possibly nested) through reflection into an ordered
+    # list of non-through reflections, from innermost (target) to outermost (owner).
+    # Each returned reflection represents exactly one JOIN hop.
+    def collect_join_reflections(reflection)
+      if reflection.through_reflection
+        collect_join_reflections(reflection.source_reflection) +
+          collect_join_reflections(reflection.through_reflection)
       else
-        reflection.foreign_key
+        [reflection]
       end
-      "#{model_class.table_name}.#{id_column}"
+    end
+
+    def direct_reflection_join(reflection)
+      if reflection.belongs_to?
+        parent_table = reflection.klass.table_name
+        parent_key   = reflection.klass.primary_key
+        child_table  = reflection.active_record.table_name
+        child_key    = reflection.foreign_key
+        "INNER JOIN #{child_table} ON #{child_table}.#{child_key} = #{parent_table}.#{parent_key}"
+      else
+        parent_table = reflection.active_record.table_name
+        parent_key   = reflection.active_record.primary_key
+        child_table  = reflection.klass.table_name
+        child_key    = reflection.foreign_key
+        "INNER JOIN #{parent_table} ON #{parent_table}.#{parent_key} = #{child_table}.#{child_key}"
+      end
     end
 
     def habtm_join(reflection)
