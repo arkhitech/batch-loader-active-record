@@ -212,7 +212,9 @@ module BatchLoaderActiveRecord
       model_class = reflection.active_record
       model_key = model_class.primary_key
       join_reflections = collect_join_reflections(reflection)
-      join_strings = join_reflections.map { |r| direct_reflection_join(r) }
+      join_strings = join_reflections.map do |join_reflection|
+        direct_reflection_join(join_reflection[:reflection], source_type: join_reflection[:source_type])
+      end
       instance_id_path = "#{model_class.table_name}.#{model_key}"
       if relation.select_values.any?
         select_relation = relation.merge(relation.select("#{instance_id_path} AS _instance_id"))
@@ -226,25 +228,39 @@ module BatchLoaderActiveRecord
       select_relation = select_relation.where("#{model_class.table_name}.#{model_key} IN (?)", ids)
     end
 
-    # Recursively flattens a (possibly nested) through reflection into an ordered
-    # list of non-through reflections, from innermost (target) to outermost (owner).
-    # Each returned reflection represents exactly one JOIN hop.
-    def collect_join_reflections(reflection)
+    # Preserve source_type while flattening through reflections so polymorphic
+    # source associations can be joined without asking Active Record to compute
+    # a class for the polymorphic reflection itself.
+    def collect_join_reflections(reflection, source_type = nil)
       if reflection.through_reflection
-        collect_join_reflections(reflection.source_reflection) +
+        next_source_type =
+          if reflection.respond_to?(:source_type) && reflection.source_type.present?
+            reflection.source_type
+          else
+            reflection.options[:source_type]
+          end
+
+        collect_join_reflections(reflection.source_reflection, next_source_type) +
           collect_join_reflections(reflection.through_reflection)
       else
-        [reflection]
+        [{ reflection: reflection, source_type: source_type }]
       end
     end
 
-    def direct_reflection_join(reflection)
+    def direct_reflection_join(reflection, source_type: nil)
       if reflection.belongs_to?
-        parent_table = reflection.klass.table_name
-        parent_key   = reflection.klass.primary_key
+        parent_class, polymorphic_type = reflection_join_class(reflection, source_type)
+        parent_table = parent_class.table_name
+        parent_key   = parent_class.primary_key
         child_table  = reflection.active_record.table_name
         child_key    = reflection.foreign_key
-        "INNER JOIN #{child_table} ON #{child_table}.#{child_key} = #{parent_table}.#{parent_key}"
+
+        join = "INNER JOIN #{child_table} ON #{child_table}.#{child_key} = #{parent_table}.#{parent_key}"
+        if polymorphic_type
+          quoted_type = ActiveRecord::Base.connection.quote(polymorphic_type)
+          join += " AND #{child_table}.#{reflection.foreign_type} = #{quoted_type}"
+        end
+        join
       else
         parent_table = reflection.active_record.table_name
         parent_key   = reflection.active_record.primary_key
@@ -252,6 +268,22 @@ module BatchLoaderActiveRecord
         child_key    = reflection.foreign_key
         "INNER JOIN #{parent_table} ON #{parent_table}.#{parent_key} = #{child_table}.#{child_key}"
       end
+    end
+
+    def reflection_join_class(reflection, source_type)
+      return [reflection.klass, nil] unless reflection.polymorphic?
+
+      raise ArgumentError, "Polymorphic through associations require a source_type" if source_type.blank?
+
+      target_class = source_type.constantize
+      polymorphic_type =
+        if target_class.respond_to?(:polymorphic_name)
+          target_class.polymorphic_name
+        else
+          target_class.base_class.name
+        end
+
+      [target_class, polymorphic_type]
     end
 
     def habtm_join(reflection)
