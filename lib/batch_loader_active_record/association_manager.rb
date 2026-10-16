@@ -164,32 +164,32 @@ module BatchLoaderActiveRecord
 
     private
 
+    # Not memoized. This manager lives for the whole process, and the association's scope lambda is evaluated
+    # when the relation is merged. Caching the relation would freeze anything the scope reads, such as the
+    # current time (`-> { where('expires_at > ?', Time.now) }`), at the first load for every later load.
     def relation_with_scope(instance, instance_scope)
-      @relation_with_scope ||= {}
-      @relation_with_scope[instance_scope&.hash || ''] ||= begin
-        relation = instance.association(reflection.name).send(:target_scope)
-        if reflection.scope
-          relation = relation.merge(reflection.scope)
-        end
-        if instance_scope
-          relation = relation.merge(instance_scope)
-          # relation = target_scope.merge(instance_scope)
-        # else
-          # relation = target_scope
-        end
-        # if reflection.type
-        #   if reflection.through_reflection
-        #     relation = relation.where(reflection.type => reflection.through_reflection.class_name)
-        #   else
-        #     relation = relation.where(reflection.type => model.to_s)
-        #   end
-        # end
-        relation
+      relation = instance.association(reflection.name).send(:target_scope)
+      if reflection.scope
+        relation = relation.merge(reflection.scope)
       end
+      if instance_scope
+        relation = relation.merge(instance_scope)
+        # relation = target_scope.merge(instance_scope)
+      # else
+        # relation = target_scope
+      end
+      # if reflection.type
+      #   if reflection.through_reflection
+      #     relation = relation.where(reflection.type => reflection.through_reflection.class_name)
+      #   else
+      #     relation = relation.where(reflection.type => model.to_s)
+      #   end
+      # end
+      relation
     end
 
     def target_scope
-      @target_scope ||= if reflection.scope
+      if reflection.scope
         reflection.klass.scope_for_association.merge(reflection.scope)
       else
         reflection.klass.scope_for_association
